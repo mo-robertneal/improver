@@ -41,6 +41,13 @@ class ExtractValueFromTable(BasePlugin):
         Args:
             row_name:
                 Name of the cube used for indexing rows.
+            table:
+                A dictionary representing the table from which values are extracted. Dictionary
+                should be in the form:
+                {"data":{column_name_1:{row_name_1:value, row_name_2:value},...},
+                "metadata":{"units":table_units}}
+                Other metadata can be included in the metadata dictionary such as a title for
+                the table but this will be ignored.
             new_name:
                 Optional new name for the resulting cube.
             table:
@@ -123,15 +130,15 @@ class ExtractValueFromTable(BasePlugin):
 
     def convert_dict_to_dataframe(self) -> DataFrame:
         """Converts a dictionary to a pandas DataFrame"""
+        table_df = DataFrame.from_dict(self.table["data"])
+        table_df.columns = table_df.columns.astype(float)
+        table_df.index = table_df.index.astype(float)
 
-        self.table = DataFrame.from_dict(self.table)
-        self.table.columns = self.table.columns.astype(float)
-        self.table.index = self.table.index.astype(float)
+        table_df = table_df.reindex(sorted(table_df.columns), axis=1)
+        table_df = table_df.reindex(sorted(table_df.index), axis=0)
 
-        self.table = self.table.reindex(sorted(self.table.columns), axis=1)
-        self.table = self.table.reindex(sorted(self.table.index), axis=0)
+        return table_df
 
-        return self.table
 
     def process(self, *cubes: List[Cube]):
         """
@@ -176,7 +183,8 @@ class ExtractValueFromTable(BasePlugin):
                 {column_cube.shape}, row cube shape: {row_cube.shape}"""
             )
 
-        table_df = self.convert_dict_to_dataframe(self.table["data"])
+
+        table_df = self.convert_dict_to_dataframe()
         result = self.extract_table_values(table_df, column_cube, row_cube)
 
         if result.dtype == np.float64:
