@@ -35,7 +35,7 @@ class ExtractValueFromTable(BasePlugin):
     selected.
     """
 
-    def __init__(self, row_name: str, new_name: str = None) -> None:
+    def __init__(self, row_name: str, new_name: str = None, table: dict) -> None:
         """Initialise the plugin
 
         Args:
@@ -43,9 +43,17 @@ class ExtractValueFromTable(BasePlugin):
                 Name of the cube used for indexing rows.
             new_name:
                 Optional new name for the resulting cube.
+            table:
+                A dictionary representing the table from which values are extracted. Dictionary
+                should be in the form:
+                {"data":{column_name_1:{row_name_1:value, row_name_2:value},...},
+                "metadata":{"units":table_units}}
+                Other metadata can be included in the metadata dictionary such as a title for
+                the table but this will be ignored.
         """
         self.row_name = row_name
         self.new_name = new_name
+        self.table = table
 
     @staticmethod
     def nearest_lower_index(
@@ -103,7 +111,7 @@ class ExtractValueFromTable(BasePlugin):
             values=row_data, sorted_table_labels=table.index
         )
 
-        result = table.to_numpy()[row_index, column_index]
+        result = self.table.to_numpy()[row_index, column_index]
 
         nan_condition = np.logical_or(np.isnan(row_data), np.isnan(columns_data))
         if nan_condition.any():
@@ -113,19 +121,19 @@ class ExtractValueFromTable(BasePlugin):
         result = result.reshape(shape)
         return result
 
-    def convert_dict_to_dataframe(self, table: dict) -> DataFrame:
+    def convert_dict_to_dataframe(self) -> DataFrame:
         """Converts a dictionary to a pandas DataFrame"""
 
-        table = DataFrame.from_dict(table)
-        table.columns = table.columns.astype(float)
-        table.index = table.index.astype(float)
+        self.table = DataFrame.from_dict(self.table)
+        self.table.columns = self.table.columns.astype(float)
+        self.table.index = self.table.index.astype(float)
 
-        table = table.reindex(sorted(table.columns), axis=1)
-        table = table.reindex(sorted(table.index), axis=0)
+        self.table = self.table.reindex(sorted(self.table.columns), axis=1)
+        self.table = self.table.reindex(sorted(self.table.index), axis=0)
 
-        return table
+        return self.table
 
-    def process(self, *cubes: List[Cube], table: dict):
+    def process(self, *cubes: List[Cube]):
         """
         Process the input cubes and extract values from a table based on the provided row and
         column indices. The row name is used to identify the cube used for indexing the rows
@@ -137,13 +145,6 @@ class ExtractValueFromTable(BasePlugin):
                 Input cubes for indexing columns and rows of the table. Exactly 2 cubes should
                 be provided one which contains the values to extract from the rows and one for
                 the columns.
-            table:
-                A dictionary representing the table from which values are extracted. Dictionary
-                should be in the form:
-                {"data":{column_name_1:{row_name_1:value, row_name_2:value},...},
-                "metadata":{"units":table_units}}
-                Other metadata can be included in the metadata dictionary such as a title for
-                the table but this will be ignored.
 
         Returns:
             Cube of the same shape and metadata as the row input cube with values extracted
@@ -175,7 +176,7 @@ class ExtractValueFromTable(BasePlugin):
                 {column_cube.shape}, row cube shape: {row_cube.shape}"""
             )
 
-        table_df = self.convert_dict_to_dataframe(table["data"])
+        table_df = self.convert_dict_to_dataframe(self.table["data"])
         result = self.extract_table_values(table_df, column_cube, row_cube)
 
         if result.dtype == np.float64:
@@ -183,5 +184,5 @@ class ExtractValueFromTable(BasePlugin):
         result_cube = row_cube.copy(data=result)
         if self.new_name:
             result_cube.rename(self.new_name)
-        result_cube.units = table["metadata"]["units"]
+        result_cube.units = self.table["metadata"]["units"]
         return result_cube
