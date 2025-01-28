@@ -35,7 +35,7 @@ class ExtractValueFromTable(BasePlugin):
     selected.
     """
 
-    def __init__(self, row_name: str, new_name: str = None, table: dict) -> None:
+    def __init__(self, row_name: str, table: dict, new_name: str = None) -> None:
         """Initialise the plugin
 
         Args:
