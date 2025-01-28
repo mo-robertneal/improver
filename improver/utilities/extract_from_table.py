@@ -50,6 +50,13 @@ class ExtractValueFromTable(BasePlugin):
                 the table but this will be ignored.
             new_name:
                 Optional new name for the resulting cube.
+            table:
+                A dictionary representing the table from which values are extracted. Dictionary
+                should be in the form:
+                {"data":{column_name_1:{row_name_1:value, row_name_2:value},...},
+                "metadata":{"units":table_units}}
+                Other metadata can be included in the metadata dictionary such as a title for
+                the table but this will be ignored.
         """
         self.row_name = row_name
         self.new_name = new_name
@@ -111,7 +118,7 @@ class ExtractValueFromTable(BasePlugin):
             values=row_data, sorted_table_labels=table.index
         )
 
-        result = table.to_numpy()[row_index, column_index]
+        result = self.table.to_numpy()[row_index, column_index]
 
         nan_condition = np.logical_or(np.isnan(row_data), np.isnan(columns_data))
         if nan_condition.any():
@@ -123,7 +130,6 @@ class ExtractValueFromTable(BasePlugin):
 
     def convert_dict_to_dataframe(self) -> DataFrame:
         """Converts a dictionary to a pandas DataFrame"""
-
         table_df = DataFrame.from_dict(self.table["data"])
         table_df.columns = table_df.columns.astype(float)
         table_df.index = table_df.index.astype(float)
@@ -132,6 +138,7 @@ class ExtractValueFromTable(BasePlugin):
         table_df = table_df.reindex(sorted(table_df.index), axis=0)
 
         return table_df
+
 
     def process(self, *cubes: List[Cube]):
         """
@@ -175,6 +182,7 @@ class ExtractValueFromTable(BasePlugin):
                 f"""Shapes of cubes do not match. Column cube shape:
                 {column_cube.shape}, row cube shape: {row_cube.shape}"""
             )
+
 
         table_df = self.convert_dict_to_dataframe()
         result = self.extract_table_values(table_df, column_cube, row_cube)
